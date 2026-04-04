@@ -9,4 +9,3 @@ pub enum MessagingIngressError {
     #[error("ciphertext size exceeds service limits")]
     PayloadTooLarge,
 }
-

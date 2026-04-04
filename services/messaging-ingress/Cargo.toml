@@ -18,3 +18,5 @@ thiserror.workspace = true
 tokio.workspace = true
 uuid.workspace = true
 
+[dev-dependencies]
+tower.workspace = true

@@ -20,11 +20,16 @@ pub struct RevokeDevice {
 
 #[async_trait]
 pub trait IdentityUseCases: Send + Sync {
-    async fn create_account(&self, command: CreateAccount) -> Result<Account, crate::errors::IdentityError>;
+    async fn create_account(
+        &self,
+        command: CreateAccount,
+    ) -> Result<Account, crate::errors::IdentityError>;
     async fn register_linked_device(
         &self,
         command: RegisterLinkedDevice,
     ) -> Result<Device, crate::errors::IdentityError>;
-    async fn revoke_device(&self, command: RevokeDevice) -> Result<(), crate::errors::IdentityError>;
+    async fn revoke_device(
+        &self,
+        command: RevokeDevice,
+    ) -> Result<(), crate::errors::IdentityError>;
 }
-

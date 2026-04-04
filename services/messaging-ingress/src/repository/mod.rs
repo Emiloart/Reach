@@ -26,4 +26,3 @@ pub trait MessageIntakeRepository: Send + Sync {
         idempotency_key: &[u8],
     ) -> Result<bool, crate::errors::MessagingIngressError>;
 }
-

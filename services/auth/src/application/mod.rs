@@ -21,11 +21,13 @@ pub struct RevokeSession {
 
 #[async_trait]
 pub trait AuthUseCases: Send + Sync {
-    async fn bootstrap_session(&self, command: BootstrapSession) -> Result<Session, crate::errors::AuthError>;
+    async fn bootstrap_session(
+        &self,
+        command: BootstrapSession,
+    ) -> Result<Session, crate::errors::AuthError>;
     async fn refresh_session(
         &self,
         command: RefreshSession,
     ) -> Result<RefreshTokenFamily, crate::errors::AuthError>;
     async fn revoke_session(&self, command: RevokeSession) -> Result<(), crate::errors::AuthError>;
 }
-

@@ -11,4 +11,3 @@ pub enum AuthError {
     #[error("insufficient auth scope")]
     InsufficientScope,
 }
-

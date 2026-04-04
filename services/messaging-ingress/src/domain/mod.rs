@@ -31,4 +31,3 @@ pub struct MessageIntakeRecord {
     pub server_received_at: DateTime<Utc>,
     pub expires_at: Option<DateTime<Utc>>,
 }
-

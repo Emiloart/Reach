@@ -35,4 +35,3 @@ pub enum TelemetryError {
     #[error("failed to initialize tracing subscriber: {0}")]
     Initialization(#[from] tracing_subscriber::util::TryInitError),
 }
-

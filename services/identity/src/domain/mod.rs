@@ -37,4 +37,3 @@ pub struct Device {
     pub registered_at: DateTime<Utc>,
     pub revoked_at: Option<DateTime<Utc>>,
 }
-

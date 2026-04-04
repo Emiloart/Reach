@@ -26,11 +26,16 @@ pub struct UploadOneTimePrekeys {
 
 #[async_trait]
 pub trait KeyUseCases: Send + Sync {
-    async fn upload_key_bundle(&self, command: UploadKeyBundle) -> Result<KeyBundle, crate::errors::KeyServiceError>;
+    async fn upload_key_bundle(
+        &self,
+        command: UploadKeyBundle,
+    ) -> Result<KeyBundle, crate::errors::KeyServiceError>;
     async fn upload_signed_prekey(
         &self,
         command: UploadSignedPrekey,
     ) -> Result<SignedPrekey, crate::errors::KeyServiceError>;
-    async fn claim_one_time_prekey(&self, device_id: DeviceId) -> Result<OneTimePrekey, crate::errors::KeyServiceError>;
+    async fn claim_one_time_prekey(
+        &self,
+        device_id: DeviceId,
+    ) -> Result<OneTimePrekey, crate::errors::KeyServiceError>;
 }
-

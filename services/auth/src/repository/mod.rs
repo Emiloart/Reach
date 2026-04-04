@@ -4,7 +4,10 @@ use reach_auth_types::SessionId;
 
 #[async_trait]
 pub trait SessionRepository: Send + Sync {
-    async fn get_session(&self, session_id: SessionId) -> Result<Option<Session>, crate::errors::AuthError>;
+    async fn get_session(
+        &self,
+        session_id: SessionId,
+    ) -> Result<Option<Session>, crate::errors::AuthError>;
     async fn upsert_session(&self, session: &Session) -> Result<(), crate::errors::AuthError>;
     async fn revoke_session(&self, session_id: SessionId) -> Result<(), crate::errors::AuthError>;
 }
@@ -19,6 +22,6 @@ pub trait RefreshTokenRepository: Send + Sync {
         &self,
         family: &RefreshTokenFamily,
     ) -> Result<(), crate::errors::AuthError>;
-    async fn mark_compromised(&self, session_id: SessionId) -> Result<(), crate::errors::AuthError>;
+    async fn mark_compromised(&self, session_id: SessionId)
+        -> Result<(), crate::errors::AuthError>;
 }
-

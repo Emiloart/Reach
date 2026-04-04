@@ -42,4 +42,3 @@ pub struct OneTimePrekey {
     pub created_at: DateTime<Utc>,
     pub claimed_at: Option<DateTime<Utc>>,
 }
-

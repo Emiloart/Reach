@@ -9,4 +9,3 @@ pub enum KeyServiceError {
     #[error("no one-time prekeys available")]
     NoAvailableOneTimePrekeys,
 }
-

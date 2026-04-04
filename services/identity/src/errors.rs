@@ -9,4 +9,3 @@ pub enum IdentityError {
     #[error("device registration conflict")]
     DeviceRegistrationConflict,
 }
-

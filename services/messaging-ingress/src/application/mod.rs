@@ -32,4 +32,3 @@ pub trait MessagingIngressUseCases: Send + Sync {
         command: SubmitEncryptedMessage,
     ) -> Result<MessageIntakeRecord, crate::errors::MessagingIngressError>;
 }
-

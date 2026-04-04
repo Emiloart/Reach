@@ -34,4 +34,3 @@ pub struct RefreshTokenFamily {
     pub compromised_at: Option<DateTime<Utc>>,
     pub expires_at: DateTime<Utc>,
 }
-
