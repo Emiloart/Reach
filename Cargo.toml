@@ -4,6 +4,7 @@ members = [
     "libs/config",
     "libs/telemetry",
     "libs/auth-types",
+    "libs/testing",
     "services/identity",
     "services/auth",
     "services/keys",
@@ -26,7 +27,8 @@ http = "1.2.0"
 secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
-sqlx = { version = "0.8.2", default-features = false, features = ["chrono", "macros", "postgres", "runtime-tokio-rustls", "uuid"] }
+sqlx = { version = "0.8.2", default-features = false, features = ["chrono", "macros", "migrate", "postgres", "runtime-tokio-rustls", "uuid"] }
+tempfile = "3.14.0"
 thiserror = "2.0.3"
 tokio = { version = "1.41.1", features = ["macros", "net", "rt-multi-thread", "signal", "time"] }
 tower = { version = "0.5.2", features = ["util"] }

@@ -14,9 +14,11 @@ reach-auth-types = { path = "../../libs/auth-types" }
 reach-config = { path = "../../libs/config" }
 reach-telemetry = { path = "../../libs/telemetry" }
 serde.workspace = true
+sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+reach-test-support = { path = "../../libs/testing" }
 tower.workspace = true

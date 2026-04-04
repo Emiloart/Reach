@@ -10,7 +10,28 @@ pub enum OneTimePrekeyState {
     Claimed,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl OneTimePrekeyState {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Available => "available",
+            Self::Claimed => "claimed",
+        }
+    }
+}
+
+impl TryFrom<&str> for OneTimePrekeyState {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "available" => Ok(Self::Available),
+            "claimed" => Ok(Self::Claimed),
+            invalid => Err(invalid.to_owned()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KeyBundle {
     pub bundle_id: Uuid,
     pub device_id: DeviceId,
@@ -23,7 +44,7 @@ pub struct KeyBundle {
     pub is_current: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignedPrekey {
     pub signed_prekey_id: Uuid,
     pub device_id: DeviceId,
@@ -33,7 +54,7 @@ pub struct SignedPrekey {
     pub superseded_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OneTimePrekey {
     pub prekey_id: Uuid,
     pub device_id: DeviceId,

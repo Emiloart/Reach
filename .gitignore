@@ -1,8 +1,8 @@
 target/
+.tools/
 .idea/
 .vscode/
 *.log
 *.tmp
 Thumbs.db
 .DS_Store
-
