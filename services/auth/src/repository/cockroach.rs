@@ -1,7 +1,9 @@
 use crate::{
     domain::{RefreshTokenFamily, Session, SessionState},
     repository::{
-        AuthConstraintViolation, AuthRepositoryError, RefreshTokenRepository, SessionRepository,
+        AuthCommandRepository, AuthConstraintViolation, AuthRepositoryError,
+        RefreshTokenRepository, RotateRefreshFamilyOutcome, RotateRefreshFamilyRecord,
+        SessionRepository,
     },
 };
 use async_trait::async_trait;
@@ -174,6 +176,231 @@ impl RefreshTokenRepository for CockroachAuthRepository {
         .map_err(AuthRepositoryError::Database)?;
 
         Ok(result.rows_affected() == 1)
+    }
+}
+
+#[async_trait]
+impl AuthCommandRepository for CockroachAuthRepository {
+    async fn create_session_with_family(
+        &self,
+        session: &Session,
+        family: &RefreshTokenFamily,
+    ) -> Result<(), AuthRepositoryError> {
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(AuthRepositoryError::Database)?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO auth.sessions (
+                session_id,
+                account_id,
+                device_id,
+                state,
+                issued_at,
+                expires_at,
+                revoked_at,
+                last_refreshed_at,
+                access_token_jti
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            "#,
+        )
+        .bind(session.session_id.0)
+        .bind(session.account_id.0)
+        .bind(session.device_id.0)
+        .bind(session.state.as_str())
+        .bind(session.issued_at)
+        .bind(session.expires_at)
+        .bind(session.revoked_at)
+        .bind(session.last_refreshed_at)
+        .bind(session.access_token_jti)
+        .execute(&mut *transaction)
+        .await
+        .map_err(map_session_insert_error)?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO auth.refresh_token_families (
+                family_id,
+                session_id,
+                current_token_hash,
+                previous_token_hash,
+                rotation_counter,
+                compromised_at,
+                expires_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            "#,
+        )
+        .bind(family.family_id)
+        .bind(family.session_id.0)
+        .bind(&family.current_token_hash)
+        .bind(&family.previous_token_hash)
+        .bind(family.rotation_counter)
+        .bind(family.compromised_at)
+        .bind(family.expires_at)
+        .execute(&mut *transaction)
+        .await
+        .map_err(map_refresh_family_insert_error)?;
+
+        transaction
+            .commit()
+            .await
+            .map_err(AuthRepositoryError::Database)?;
+
+        Ok(())
+    }
+
+    async fn rotate_refresh_family(
+        &self,
+        command: &RotateRefreshFamilyRecord,
+    ) -> Result<RotateRefreshFamilyOutcome, AuthRepositoryError> {
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(AuthRepositoryError::Database)?;
+
+        let session = sqlx::query_as::<_, SessionRow>(
+            r#"
+            SELECT
+                session_id,
+                account_id,
+                device_id,
+                state,
+                issued_at,
+                expires_at,
+                revoked_at,
+                last_refreshed_at,
+                access_token_jti
+            FROM auth.sessions
+            WHERE session_id = $1
+            FOR UPDATE
+            "#,
+        )
+        .bind(command.session_id.0)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(AuthRepositoryError::Database)?;
+
+        let session = match session {
+            Some(session) => session,
+            None => return Ok(RotateRefreshFamilyOutcome::SessionNotFound),
+        };
+
+        match SessionState::try_from(session.state.as_str())
+            .map_err(AuthRepositoryError::InvalidSessionState)?
+        {
+            SessionState::Revoked => return Ok(RotateRefreshFamilyOutcome::SessionRevoked),
+            SessionState::Expired => return Ok(RotateRefreshFamilyOutcome::SessionExpired),
+            SessionState::Active => {}
+        }
+
+        let family = sqlx::query_as::<_, RefreshTokenFamilyRow>(
+            r#"
+            SELECT
+                family_id,
+                session_id,
+                current_token_hash,
+                previous_token_hash,
+                rotation_counter,
+                compromised_at,
+                expires_at
+            FROM auth.refresh_token_families
+            WHERE session_id = $1
+            FOR UPDATE
+            "#,
+        )
+        .bind(command.session_id.0)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(AuthRepositoryError::Database)?;
+
+        let family = match family {
+            Some(family) => family,
+            None => return Ok(RotateRefreshFamilyOutcome::RefreshFamilyNotFound),
+        };
+
+        if family.compromised_at.is_some() {
+            return Ok(RotateRefreshFamilyOutcome::RefreshFamilyCompromised);
+        }
+
+        if family.current_token_hash != command.presented_refresh_token_hash {
+            if family.previous_token_hash.as_deref()
+                == Some(command.presented_refresh_token_hash.as_slice())
+            {
+                sqlx::query(
+                    r#"
+                    UPDATE auth.refresh_token_families
+                    SET compromised_at = $2
+                    WHERE session_id = $1
+                    "#,
+                )
+                .bind(command.session_id.0)
+                .bind(command.rotated_at)
+                .execute(&mut *transaction)
+                .await
+                .map_err(AuthRepositoryError::Database)?;
+
+                transaction
+                    .commit()
+                    .await
+                    .map_err(AuthRepositoryError::Database)?;
+
+                return Ok(RotateRefreshFamilyOutcome::RefreshFamilyCompromised);
+            }
+
+            return Ok(RotateRefreshFamilyOutcome::PresentedTokenMismatch);
+        }
+
+        let family = sqlx::query_as::<_, RefreshTokenFamilyRow>(
+            r#"
+            UPDATE auth.refresh_token_families
+            SET
+                previous_token_hash = current_token_hash,
+                current_token_hash = $2,
+                rotation_counter = rotation_counter + 1,
+                expires_at = $3
+            WHERE session_id = $1
+            RETURNING
+                family_id,
+                session_id,
+                current_token_hash,
+                previous_token_hash,
+                rotation_counter,
+                compromised_at,
+                expires_at
+            "#,
+        )
+        .bind(command.session_id.0)
+        .bind(&command.next_refresh_token_hash)
+        .bind(command.next_refresh_expires_at)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(AuthRepositoryError::Database)?;
+
+        sqlx::query(
+            r#"
+            UPDATE auth.sessions
+            SET last_refreshed_at = $2
+            WHERE session_id = $1
+            "#,
+        )
+        .bind(command.session_id.0)
+        .bind(command.rotated_at)
+        .execute(&mut *transaction)
+        .await
+        .map_err(AuthRepositoryError::Database)?;
+
+        transaction
+            .commit()
+            .await
+            .map_err(AuthRepositoryError::Database)?;
+
+        Ok(RotateRefreshFamilyOutcome::Rotated(family.into()))
     }
 }
 

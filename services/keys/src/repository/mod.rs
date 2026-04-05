@@ -2,6 +2,7 @@ mod cockroach;
 
 use crate::domain::{KeyBundle, OneTimePrekey, SignedPrekey};
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use reach_auth_types::DeviceId;
 use thiserror::Error;
 use uuid::Uuid;
@@ -23,6 +24,16 @@ pub enum KeyRepositoryError {
     InvalidOneTimePrekeyState(String),
     #[error("database operation failed: {0}")]
     Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Clone)]
+pub struct PublishCurrentKeyBundleRecord {
+    pub bundle_id: Uuid,
+    pub device_id: DeviceId,
+    pub identity_key_public: Vec<u8>,
+    pub identity_key_alg: String,
+    pub signed_prekey_id: Uuid,
+    pub published_at: DateTime<Utc>,
 }
 
 #[async_trait]
@@ -51,4 +62,12 @@ pub trait OneTimePrekeyRepository: Send + Sync {
         &self,
         device_id: DeviceId,
     ) -> Result<Option<OneTimePrekey>, KeyRepositoryError>;
+}
+
+#[async_trait]
+pub trait KeyBundleCommandRepository: Send + Sync {
+    async fn publish_current_bundle(
+        &self,
+        command: &PublishCurrentKeyBundleRecord,
+    ) -> Result<KeyBundle, KeyRepositoryError>;
 }

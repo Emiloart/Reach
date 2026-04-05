@@ -1,7 +1,8 @@
 use crate::{
     domain::{KeyBundle, OneTimePrekey, OneTimePrekeyState, SignedPrekey},
     repository::{
-        KeyBundleRepository, KeyConstraintViolation, KeyRepositoryError, OneTimePrekeyRepository,
+        KeyBundleCommandRepository, KeyBundleRepository, KeyConstraintViolation,
+        KeyRepositoryError, OneTimePrekeyRepository, PublishCurrentKeyBundleRecord,
         SignedPrekeyRepository,
     },
 };
@@ -235,6 +236,96 @@ impl OneTimePrekeyRepository for CockroachKeyRepository {
         .map_err(KeyRepositoryError::Database)?;
 
         row.map(TryInto::try_into).transpose()
+    }
+}
+
+#[async_trait]
+impl KeyBundleCommandRepository for CockroachKeyRepository {
+    async fn publish_current_bundle(
+        &self,
+        command: &PublishCurrentKeyBundleRecord,
+    ) -> Result<KeyBundle, KeyRepositoryError> {
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(KeyRepositoryError::Database)?;
+
+        let current_bundle_version = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT bundle_version
+            FROM keys.key_bundles
+            WHERE device_id = $1
+            ORDER BY bundle_version DESC
+            LIMIT 1
+            FOR UPDATE
+            "#,
+        )
+        .bind(command.device_id.0)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(KeyRepositoryError::Database)?;
+
+        sqlx::query(
+            r#"
+            UPDATE keys.key_bundles
+            SET
+                is_current = false,
+                superseded_at = $2
+            WHERE device_id = $1
+              AND is_current = true
+            "#,
+        )
+        .bind(command.device_id.0)
+        .bind(command.published_at)
+        .execute(&mut *transaction)
+        .await
+        .map_err(KeyRepositoryError::Database)?;
+
+        let next_bundle_version = current_bundle_version.unwrap_or(0) + 1;
+        let key_bundle = sqlx::query_as::<_, KeyBundleRow>(
+            r#"
+            INSERT INTO keys.key_bundles (
+                bundle_id,
+                device_id,
+                bundle_version,
+                identity_key_public,
+                identity_key_alg,
+                signed_prekey_id,
+                published_at,
+                superseded_at,
+                is_current
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, true)
+            RETURNING
+                bundle_id,
+                device_id,
+                bundle_version,
+                identity_key_public,
+                identity_key_alg,
+                signed_prekey_id,
+                published_at,
+                superseded_at,
+                is_current
+            "#,
+        )
+        .bind(command.bundle_id)
+        .bind(command.device_id.0)
+        .bind(next_bundle_version)
+        .bind(&command.identity_key_public)
+        .bind(&command.identity_key_alg)
+        .bind(command.signed_prekey_id)
+        .bind(command.published_at)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(map_key_bundle_insert_error)?;
+
+        transaction
+            .commit()
+            .await
+            .map_err(KeyRepositoryError::Database)?;
+
+        Ok(key_bundle.into())
     }
 }
 

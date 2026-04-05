@@ -13,6 +13,7 @@ chrono.workspace = true
 reach-auth-types = { path = "../../libs/auth-types" }
 reach-config = { path = "../../libs/config" }
 reach-telemetry = { path = "../../libs/telemetry" }
+secrecy.workspace = true
 serde.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
