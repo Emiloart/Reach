@@ -12,6 +12,7 @@ axum.workspace = true
 chrono.workspace = true
 reach-auth-types = { path = "../../libs/auth-types" }
 reach-config = { path = "../../libs/config" }
+reach-request-auth = { path = "../../libs/request-auth" }
 reach-telemetry = { path = "../../libs/telemetry" }
 secrecy.workspace = true
 serde.workspace = true
@@ -21,5 +22,6 @@ tokio.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+reach-auth-types = { path = "../../libs/auth-types" }
 reach-test-support = { path = "../../libs/testing" }
 tower.workspace = true

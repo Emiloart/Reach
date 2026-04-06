@@ -3,11 +3,12 @@ use crate::{
     errors::IdentityError,
 };
 use axum::{
-    extract::State,
+    extract::{FromRef, State},
     http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
+use reach_request_auth::{AuthenticatedRequestContext, InternalRequestAuthenticator};
 use serde::{Serialize, Serializer};
 use std::sync::Arc;
 
@@ -17,12 +18,18 @@ pub fn health_router() -> Router {
         .route("/ready", get(ready))
 }
 
-pub fn command_router(use_cases: Arc<dyn IdentityUseCases>) -> Router {
+pub fn command_router(
+    use_cases: Arc<dyn IdentityUseCases>,
+    authenticator: Arc<InternalRequestAuthenticator>,
+) -> Router {
     Router::new()
         .route("/accounts", post(create_account))
         .route("/devices", post(register_device))
         .route("/devices/revoke", post(revoke_device))
-        .with_state(IdentityHttpState { use_cases })
+        .with_state(IdentityHttpState {
+            use_cases,
+            authenticator,
+        })
 }
 
 async fn live() -> Json<HealthResponse> {
@@ -41,29 +48,39 @@ struct HealthResponse {
 #[derive(Clone)]
 struct IdentityHttpState {
     use_cases: Arc<dyn IdentityUseCases>,
+    authenticator: Arc<InternalRequestAuthenticator>,
+}
+
+impl FromRef<IdentityHttpState> for Arc<InternalRequestAuthenticator> {
+    fn from_ref(input: &IdentityHttpState) -> Self {
+        input.authenticator.clone()
+    }
 }
 
 async fn create_account(
     State(state): State<IdentityHttpState>,
+    AuthenticatedRequestContext(context): AuthenticatedRequestContext,
     Json(command): Json<CreateAccountInput>,
 ) -> Result<Json<crate::domain::Account>, IdentityHttpError> {
-    let account = state.use_cases.create_account(command).await?;
+    let account = state.use_cases.create_account(context, command).await?;
     Ok(Json(account))
 }
 
 async fn register_device(
     State(state): State<IdentityHttpState>,
+    AuthenticatedRequestContext(context): AuthenticatedRequestContext,
     Json(command): Json<RegisterDeviceInput>,
 ) -> Result<Json<crate::domain::Device>, IdentityHttpError> {
-    let device = state.use_cases.register_device(command).await?;
+    let device = state.use_cases.register_device(context, command).await?;
     Ok(Json(device))
 }
 
 async fn revoke_device(
     State(state): State<IdentityHttpState>,
+    AuthenticatedRequestContext(context): AuthenticatedRequestContext,
     Json(command): Json<RevokeDeviceInput>,
 ) -> Result<Json<crate::domain::Device>, IdentityHttpError> {
-    let device = state.use_cases.revoke_device(command).await?;
+    let device = state.use_cases.revoke_device(context, command).await?;
     Ok(Json(device))
 }
 
@@ -78,6 +95,7 @@ impl From<IdentityError> for IdentityHttpError {
 impl axum::response::IntoResponse for IdentityHttpError {
     fn into_response(self) -> axum::response::Response {
         let status = match self.0 {
+            IdentityError::InsufficientScope => StatusCode::FORBIDDEN,
             IdentityError::InvalidAccountId
             | IdentityError::InvalidDeviceId
             | IdentityError::InvalidDeviceNumber
@@ -112,6 +130,7 @@ struct ErrorResponse {
 
 fn error_code(error: &IdentityError) -> &'static str {
     match error {
+        IdentityError::InsufficientScope => "insufficient_scope",
         IdentityError::InvalidAccountId => "invalid_account_id",
         IdentityError::InvalidDeviceId => "invalid_device_id",
         IdentityError::InvalidDeviceNumber => "invalid_device_number",

@@ -1,8 +1,11 @@
 use crate::repository::AuthRepositoryError;
+use reach_identity_lifecycle::IdentityLifecycleError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum AuthError {
+    #[error("insufficient auth scope")]
+    InsufficientScope,
     #[error("invalid session id")]
     InvalidSessionId,
     #[error("invalid account id")]
@@ -19,6 +22,16 @@ pub enum AuthError {
     InvalidRefreshTokenHash,
     #[error("invalid refresh token expiry")]
     InvalidRefreshExpiry,
+    #[error("account not found")]
+    AccountNotFound,
+    #[error("account is not active")]
+    AccountNotActive,
+    #[error("device not found")]
+    DeviceNotFound,
+    #[error("device is not active")]
+    DeviceNotActive,
+    #[error("device does not belong to account")]
+    DeviceAccountMismatch,
     #[error("session not found")]
     SessionNotFound,
     #[error("session is revoked")]
@@ -35,8 +48,8 @@ pub enum AuthError {
     RefreshTokenCompromised,
     #[error("presented refresh token does not match current family")]
     RefreshTokenMismatch,
-    #[error("insufficient auth scope")]
-    InsufficientScope,
+    #[error("identity lifecycle read failure: {0}")]
+    Lifecycle(#[source] IdentityLifecycleError),
     #[error("auth storage failure: {0}")]
     Storage(#[source] AuthRepositoryError),
 }

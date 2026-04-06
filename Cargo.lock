@@ -1208,6 +1208,9 @@ dependencies = [
  "chrono",
  "reach-auth-types",
  "reach-config",
+ "reach-identity-lifecycle",
+ "reach-identity-service",
+ "reach-request-auth",
  "reach-telemetry",
  "reach-test-support",
  "secrecy",
@@ -1232,9 +1235,21 @@ name = "reach-config"
 version = "0.1.0"
 dependencies = [
  "config",
+ "reach-auth-types",
  "secrecy",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "reach-identity-lifecycle"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "reach-auth-types",
+ "sqlx",
+ "thiserror",
+ "uuid",
 ]
 
 [[package]]
@@ -1246,6 +1261,7 @@ dependencies = [
  "chrono",
  "reach-auth-types",
  "reach-config",
+ "reach-request-auth",
  "reach-telemetry",
  "reach-test-support",
  "secrecy",
@@ -1266,6 +1282,9 @@ dependencies = [
  "chrono",
  "reach-auth-types",
  "reach-config",
+ "reach-identity-lifecycle",
+ "reach-identity-service",
+ "reach-request-auth",
  "reach-telemetry",
  "reach-test-support",
  "secrecy",
@@ -1292,6 +1311,20 @@ dependencies = [
  "tokio",
  "tower",
  "uuid",
+]
+
+[[package]]
+name = "reach-request-auth"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "reach-auth-types",
+ "reach-config",
+ "secrecy",
+ "serde",
+ "subtle",
+ "thiserror",
 ]
 
 [[package]]

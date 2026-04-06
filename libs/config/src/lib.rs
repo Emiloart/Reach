@@ -1,4 +1,5 @@
 use config::{Config, Environment};
+use reach_auth_types::AuthScope;
 use secrecy::SecretString;
 use serde::{de::DeserializeOwned, Deserialize};
 use std::net::SocketAddr;
@@ -59,11 +60,24 @@ pub struct SignerConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct InternalServiceCredentialConfig {
+    pub service_name: String,
+    pub token: SecretString,
+    pub scopes: Vec<AuthScope>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct InternalAuthConfig {
+    pub service_tokens: Vec<InternalServiceCredentialConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct IdentityServiceConfig {
     pub service: ServiceMetadata,
     pub http: HttpServerConfig,
     pub database: PostgresConfig,
     pub telemetry: TelemetryConfig,
+    pub internal_auth: InternalAuthConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -74,6 +88,7 @@ pub struct AuthServiceConfig {
     pub valkey: ValkeyConfig,
     pub telemetry: TelemetryConfig,
     pub signer: SignerConfig,
+    pub internal_auth: InternalAuthConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -83,6 +98,7 @@ pub struct KeyServiceConfig {
     pub database: PostgresConfig,
     pub valkey: ValkeyConfig,
     pub telemetry: TelemetryConfig,
+    pub internal_auth: InternalAuthConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]

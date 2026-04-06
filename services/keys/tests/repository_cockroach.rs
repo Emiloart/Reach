@@ -52,8 +52,9 @@ async fn key_bundle_storage_and_fetch_round_trip() -> Result<(), Box<dyn std::er
     };
     KeyBundleRepository::insert(&repository, &key_bundle).await?;
 
-    let fetched = repository.get_current(device_id).await?;
-    let fetched_prekey = repository.get_by_id(signed_prekey.signed_prekey_id).await?;
+    let fetched = KeyBundleRepository::get_current(&repository, device_id).await?;
+    let fetched_prekey =
+        SignedPrekeyRepository::get_by_id(&repository, signed_prekey.signed_prekey_id).await?;
 
     assert_eq!(fetched, Some(key_bundle));
     assert_eq!(fetched_prekey, Some(signed_prekey));

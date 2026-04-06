@@ -3,6 +3,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum IdentityError {
+    #[error("insufficient auth scope")]
+    InsufficientScope,
     #[error("invalid account id")]
     InvalidAccountId,
     #[error("invalid device id")]

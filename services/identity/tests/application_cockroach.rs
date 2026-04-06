@@ -1,4 +1,6 @@
-use reach_auth_types::{AccountId, DeviceId};
+use reach_auth_types::{
+    AccountId, AuthScope, DeviceId, InternalServicePrincipal, Principal, RequestContext,
+};
 use reach_identity_service::{
     application::{
         CreateAccountInput, IdentityCommandService, IdentityUseCases, RegisterDeviceInput,
@@ -14,6 +16,16 @@ use uuid::Uuid;
 
 static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 
+fn internal_context(scopes: &[AuthScope]) -> RequestContext {
+    RequestContext {
+        principal: Principal::InternalService(InternalServicePrincipal {
+            service_name: "reach-tests".to_owned(),
+            scopes: scopes.to_vec(),
+        }),
+        request_id: Some("req-test".to_owned()),
+    }
+}
+
 #[tokio::test]
 async fn duplicate_device_registration_returns_conflict() -> Result<(), Box<dyn std::error::Error>>
 {
@@ -24,28 +36,36 @@ async fn duplicate_device_registration_returns_conflict() -> Result<(), Box<dyn 
     let repository = CockroachIdentityRepository::new(pool);
     let service = IdentityCommandService::new(repository);
     let account_id = AccountId(Uuid::now_v7());
+    let create_account_context = internal_context(&[AuthScope::IdentityAccountCreate]);
+    let register_device_context = internal_context(&[AuthScope::IdentityDeviceRegister]);
 
     service
-        .create_account(CreateAccountInput { account_id })
+        .create_account(create_account_context, CreateAccountInput { account_id })
         .await?;
     service
-        .register_device(RegisterDeviceInput {
-            account_id,
-            device_id: DeviceId(Uuid::now_v7()),
-            device_number: 1,
-            platform: "ios".to_owned(),
-            app_version: "1.0.0".to_owned(),
-        })
+        .register_device(
+            register_device_context.clone(),
+            RegisterDeviceInput {
+                account_id,
+                device_id: DeviceId(Uuid::now_v7()),
+                device_number: 1,
+                platform: "ios".to_owned(),
+                app_version: "1.0.0".to_owned(),
+            },
+        )
         .await?;
 
     let duplicate = service
-        .register_device(RegisterDeviceInput {
-            account_id,
-            device_id: DeviceId(Uuid::now_v7()),
-            device_number: 1,
-            platform: "android".to_owned(),
-            app_version: "1.0.0".to_owned(),
-        })
+        .register_device(
+            register_device_context,
+            RegisterDeviceInput {
+                account_id,
+                device_id: DeviceId(Uuid::now_v7()),
+                device_number: 1,
+                platform: "android".to_owned(),
+                app_version: "1.0.0".to_owned(),
+            },
+        )
         .await;
 
     assert!(matches!(
@@ -66,31 +86,43 @@ async fn revoked_device_cannot_be_revoked_twice() -> Result<(), Box<dyn std::err
     let service = IdentityCommandService::new(repository);
     let account_id = AccountId(Uuid::now_v7());
     let device_id = DeviceId(Uuid::now_v7());
+    let create_account_context = internal_context(&[AuthScope::IdentityAccountCreate]);
+    let register_device_context = internal_context(&[AuthScope::IdentityDeviceRegister]);
+    let revoke_device_context = internal_context(&[AuthScope::IdentityDeviceRevoke]);
 
     service
-        .create_account(CreateAccountInput { account_id })
+        .create_account(create_account_context, CreateAccountInput { account_id })
         .await?;
     service
-        .register_device(RegisterDeviceInput {
-            account_id,
-            device_id,
-            device_number: 1,
-            platform: "ios".to_owned(),
-            app_version: "1.0.0".to_owned(),
-        })
+        .register_device(
+            register_device_context,
+            RegisterDeviceInput {
+                account_id,
+                device_id,
+                device_number: 1,
+                platform: "ios".to_owned(),
+                app_version: "1.0.0".to_owned(),
+            },
+        )
         .await?;
 
     let revoked = service
-        .revoke_device(RevokeDeviceInput {
-            account_id,
-            device_id,
-        })
+        .revoke_device(
+            revoke_device_context.clone(),
+            RevokeDeviceInput {
+                account_id,
+                device_id,
+            },
+        )
         .await?;
     let second_revoke = service
-        .revoke_device(RevokeDeviceInput {
-            account_id,
-            device_id,
-        })
+        .revoke_device(
+            revoke_device_context,
+            RevokeDeviceInput {
+                account_id,
+                device_id,
+            },
+        )
         .await;
 
     assert_eq!(revoked.status, DeviceStatus::Revoked);

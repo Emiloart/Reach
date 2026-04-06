@@ -9,7 +9,10 @@ use crate::{
 };
 use async_trait::async_trait;
 use chrono::{Timelike, Utc};
-use reach_auth_types::{AccountId, DeviceId, SessionId};
+use reach_auth_types::{AccountId, AuthScope, DeviceId, RequestContext, SessionId};
+use reach_identity_lifecycle::{
+    AccountLifecycleState, DeviceLifecycleStatus, IdentityLifecycleReader,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -49,37 +52,48 @@ pub struct CreatedSession {
 pub trait AuthUseCases: Send + Sync {
     async fn create_session(
         &self,
+        context: RequestContext,
         command: CreateSessionInput,
     ) -> Result<CreatedSession, AuthError>;
     async fn rotate_refresh_family(
         &self,
+        context: RequestContext,
         command: RotateRefreshFamilyInput,
     ) -> Result<RefreshTokenFamily, AuthError>;
-    async fn revoke_session(&self, command: RevokeSessionInput) -> Result<Session, AuthError>;
+    async fn revoke_session(
+        &self,
+        context: RequestContext,
+        command: RevokeSessionInput,
+    ) -> Result<Session, AuthError>;
 }
 
 #[derive(Debug, Clone)]
-pub struct AuthCommandService<R> {
+pub struct AuthCommandService<R, L> {
     repository: Arc<R>,
+    lifecycle_reader: Arc<L>,
 }
 
-impl<R> AuthCommandService<R> {
-    pub fn new(repository: R) -> Self {
+impl<R, L> AuthCommandService<R, L> {
+    pub fn new(repository: R, lifecycle_reader: L) -> Self {
         Self {
             repository: Arc::new(repository),
+            lifecycle_reader: Arc::new(lifecycle_reader),
         }
     }
 }
 
 #[async_trait]
-impl<R> AuthUseCases for AuthCommandService<R>
+impl<R, L> AuthUseCases for AuthCommandService<R, L>
 where
     R: SessionRepository + RefreshTokenRepository + AuthCommandRepository + Send + Sync + 'static,
+    L: IdentityLifecycleReader + Send + Sync + 'static,
 {
     async fn create_session(
         &self,
+        context: RequestContext,
         command: CreateSessionInput,
     ) -> Result<CreatedSession, AuthError> {
+        authorize(&context, AuthScope::AuthSessionCreate)?;
         validate_session_id(command.session_id)?;
         validate_account_id(command.account_id)?;
         validate_device_id(command.device_id)?;
@@ -94,6 +108,9 @@ where
         if command.refresh_expires_at <= issued_at {
             return Err(AuthError::InvalidRefreshExpiry);
         }
+
+        self.ensure_active_identity_device(command.account_id, command.device_id)
+            .await?;
 
         let session = Session {
             session_id: command.session_id,
@@ -129,8 +146,10 @@ where
 
     async fn rotate_refresh_family(
         &self,
+        context: RequestContext,
         command: RotateRefreshFamilyInput,
     ) -> Result<RefreshTokenFamily, AuthError> {
+        authorize(&context, AuthScope::AuthSessionRotate)?;
         validate_session_id(command.session_id)?;
         validate_hash(&command.presented_refresh_token_hash)?;
         validate_hash(&command.next_refresh_token_hash)?;
@@ -143,6 +162,16 @@ where
         if command.next_refresh_expires_at <= rotated_at {
             return Err(AuthError::InvalidRefreshExpiry);
         }
+
+        let session = self
+            .repository
+            .get_session(command.session_id)
+            .await
+            .map_err(map_auth_repository_error)?
+            .ok_or(AuthError::SessionNotFound)?;
+
+        self.ensure_active_identity_device(session.account_id, session.device_id)
+            .await?;
 
         let outcome = self
             .repository
@@ -173,7 +202,12 @@ where
         }
     }
 
-    async fn revoke_session(&self, command: RevokeSessionInput) -> Result<Session, AuthError> {
+    async fn revoke_session(
+        &self,
+        context: RequestContext,
+        command: RevokeSessionInput,
+    ) -> Result<Session, AuthError> {
+        authorize(&context, AuthScope::AuthSessionRevoke)?;
         validate_session_id(command.session_id)?;
 
         let session = self
@@ -207,9 +241,56 @@ where
     }
 }
 
+impl<R, L> AuthCommandService<R, L>
+where
+    L: IdentityLifecycleReader + Send + Sync + 'static,
+{
+    async fn ensure_active_identity_device(
+        &self,
+        account_id: AccountId,
+        device_id: DeviceId,
+    ) -> Result<(), AuthError> {
+        let account = self
+            .lifecycle_reader
+            .get_account(account_id)
+            .await
+            .map_err(AuthError::Lifecycle)?
+            .ok_or(AuthError::AccountNotFound)?;
+
+        if account.state != AccountLifecycleState::Active {
+            return Err(AuthError::AccountNotActive);
+        }
+
+        let device = self
+            .lifecycle_reader
+            .get_device(device_id)
+            .await
+            .map_err(AuthError::Lifecycle)?
+            .ok_or(AuthError::DeviceNotFound)?;
+
+        if device.account_id != account_id {
+            return Err(AuthError::DeviceAccountMismatch);
+        }
+
+        if device.status != DeviceLifecycleStatus::Active {
+            return Err(AuthError::DeviceNotActive);
+        }
+
+        Ok(())
+    }
+}
+
 fn validate_session_id(session_id: SessionId) -> Result<(), AuthError> {
     if session_id.0.is_nil() {
         return Err(AuthError::InvalidSessionId);
+    }
+
+    Ok(())
+}
+
+fn authorize(context: &RequestContext, scope: AuthScope) -> Result<(), AuthError> {
+    if !context.has_scope(scope) {
+        return Err(AuthError::InsufficientScope);
     }
 
     Ok(())

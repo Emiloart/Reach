@@ -27,6 +27,15 @@ pub enum KeyRepositoryError {
 }
 
 #[derive(Debug, Clone)]
+pub struct PublishSignedPrekeyRecord {
+    pub signed_prekey_id: Uuid,
+    pub device_id: DeviceId,
+    pub public_key: Vec<u8>,
+    pub signature: Vec<u8>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone)]
 pub struct PublishCurrentKeyBundleRecord {
     pub bundle_id: Uuid,
     pub device_id: DeviceId,
@@ -48,6 +57,10 @@ pub trait KeyBundleRepository: Send + Sync {
 
 #[async_trait]
 pub trait SignedPrekeyRepository: Send + Sync {
+    async fn get_current(
+        &self,
+        device_id: DeviceId,
+    ) -> Result<Option<SignedPrekey>, KeyRepositoryError>;
     async fn get_by_id(
         &self,
         signed_prekey_id: Uuid,
@@ -70,4 +83,12 @@ pub trait KeyBundleCommandRepository: Send + Sync {
         &self,
         command: &PublishCurrentKeyBundleRecord,
     ) -> Result<KeyBundle, KeyRepositoryError>;
+}
+
+#[async_trait]
+pub trait SignedPrekeyCommandRepository: Send + Sync {
+    async fn publish_current_signed_prekey(
+        &self,
+        command: &PublishSignedPrekeyRecord,
+    ) -> Result<SignedPrekey, KeyRepositoryError>;
 }

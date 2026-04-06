@@ -7,7 +7,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use chrono::{Timelike, Utc};
-use reach_auth_types::{AccountId, DeviceId};
+use reach_auth_types::{AccountId, AuthScope, DeviceId, RequestContext};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -33,9 +33,21 @@ pub struct RevokeDeviceInput {
 
 #[async_trait]
 pub trait IdentityUseCases: Send + Sync {
-    async fn create_account(&self, command: CreateAccountInput) -> Result<Account, IdentityError>;
-    async fn register_device(&self, command: RegisterDeviceInput) -> Result<Device, IdentityError>;
-    async fn revoke_device(&self, command: RevokeDeviceInput) -> Result<Device, IdentityError>;
+    async fn create_account(
+        &self,
+        context: RequestContext,
+        command: CreateAccountInput,
+    ) -> Result<Account, IdentityError>;
+    async fn register_device(
+        &self,
+        context: RequestContext,
+        command: RegisterDeviceInput,
+    ) -> Result<Device, IdentityError>;
+    async fn revoke_device(
+        &self,
+        context: RequestContext,
+        command: RevokeDeviceInput,
+    ) -> Result<Device, IdentityError>;
 }
 
 #[derive(Debug, Clone)]
@@ -56,7 +68,12 @@ impl<R> IdentityUseCases for IdentityCommandService<R>
 where
     R: AccountRepository + DeviceRepository + Send + Sync + 'static,
 {
-    async fn create_account(&self, command: CreateAccountInput) -> Result<Account, IdentityError> {
+    async fn create_account(
+        &self,
+        context: RequestContext,
+        command: CreateAccountInput,
+    ) -> Result<Account, IdentityError> {
+        authorize(&context, AuthScope::IdentityAccountCreate)?;
         validate_account_id(command.account_id)?;
 
         let timestamp = db_timestamp();
@@ -76,7 +93,12 @@ where
         Ok(account)
     }
 
-    async fn register_device(&self, command: RegisterDeviceInput) -> Result<Device, IdentityError> {
+    async fn register_device(
+        &self,
+        context: RequestContext,
+        command: RegisterDeviceInput,
+    ) -> Result<Device, IdentityError> {
+        authorize(&context, AuthScope::IdentityDeviceRegister)?;
         validate_account_id(command.account_id)?;
         validate_device_id(command.device_id)?;
         validate_device_number(command.device_number)?;
@@ -110,7 +132,12 @@ where
         Ok(device)
     }
 
-    async fn revoke_device(&self, command: RevokeDeviceInput) -> Result<Device, IdentityError> {
+    async fn revoke_device(
+        &self,
+        context: RequestContext,
+        command: RevokeDeviceInput,
+    ) -> Result<Device, IdentityError> {
+        authorize(&context, AuthScope::IdentityDeviceRevoke)?;
         validate_account_id(command.account_id)?;
         validate_device_id(command.device_id)?;
 
@@ -147,6 +174,14 @@ where
 fn validate_account_id(account_id: AccountId) -> Result<(), IdentityError> {
     if account_id.0.is_nil() {
         return Err(IdentityError::InvalidAccountId);
+    }
+
+    Ok(())
+}
+
+fn authorize(context: &RequestContext, scope: AuthScope) -> Result<(), IdentityError> {
+    if !context.has_scope(scope) {
+        return Err(IdentityError::InsufficientScope);
     }
 
     Ok(())

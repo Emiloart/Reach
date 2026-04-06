@@ -3,11 +3,12 @@ use crate::{
     errors::AuthError,
 };
 use axum::{
-    extract::State,
+    extract::{FromRef, State},
     http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
+use reach_request_auth::{AuthenticatedRequestContext, InternalRequestAuthenticator};
 use serde::Serialize;
 use std::sync::Arc;
 
@@ -17,12 +18,18 @@ pub fn health_router() -> Router {
         .route("/ready", get(ready))
 }
 
-pub fn command_router(use_cases: Arc<dyn AuthUseCases>) -> Router {
+pub fn command_router(
+    use_cases: Arc<dyn AuthUseCases>,
+    authenticator: Arc<InternalRequestAuthenticator>,
+) -> Router {
     Router::new()
         .route("/sessions", post(create_session))
         .route("/sessions/revoke", post(revoke_session))
         .route("/refresh-families/rotate", post(rotate_refresh_family))
-        .with_state(AuthHttpState { use_cases })
+        .with_state(AuthHttpState {
+            use_cases,
+            authenticator,
+        })
 }
 
 async fn live() -> Json<HealthResponse> {
@@ -41,29 +48,42 @@ struct HealthResponse {
 #[derive(Clone)]
 struct AuthHttpState {
     use_cases: Arc<dyn AuthUseCases>,
+    authenticator: Arc<InternalRequestAuthenticator>,
+}
+
+impl FromRef<AuthHttpState> for Arc<InternalRequestAuthenticator> {
+    fn from_ref(input: &AuthHttpState) -> Self {
+        input.authenticator.clone()
+    }
 }
 
 async fn create_session(
     State(state): State<AuthHttpState>,
+    AuthenticatedRequestContext(context): AuthenticatedRequestContext,
     Json(command): Json<CreateSessionInput>,
 ) -> Result<Json<crate::application::CreatedSession>, AuthHttpError> {
-    let created_session = state.use_cases.create_session(command).await?;
+    let created_session = state.use_cases.create_session(context, command).await?;
     Ok(Json(created_session))
 }
 
 async fn revoke_session(
     State(state): State<AuthHttpState>,
+    AuthenticatedRequestContext(context): AuthenticatedRequestContext,
     Json(command): Json<RevokeSessionInput>,
 ) -> Result<Json<crate::domain::Session>, AuthHttpError> {
-    let session = state.use_cases.revoke_session(command).await?;
+    let session = state.use_cases.revoke_session(context, command).await?;
     Ok(Json(session))
 }
 
 async fn rotate_refresh_family(
     State(state): State<AuthHttpState>,
+    AuthenticatedRequestContext(context): AuthenticatedRequestContext,
     Json(command): Json<RotateRefreshFamilyInput>,
 ) -> Result<Json<crate::domain::RefreshTokenFamily>, AuthHttpError> {
-    let family = state.use_cases.rotate_refresh_family(command).await?;
+    let family = state
+        .use_cases
+        .rotate_refresh_family(context, command)
+        .await?;
     Ok(Json(family))
 }
 
@@ -78,6 +98,7 @@ impl From<AuthError> for AuthHttpError {
 impl axum::response::IntoResponse for AuthHttpError {
     fn into_response(self) -> axum::response::Response {
         let status = match self.0 {
+            AuthError::InsufficientScope => StatusCode::FORBIDDEN,
             AuthError::InvalidSessionId
             | AuthError::InvalidAccountId
             | AuthError::InvalidDeviceId
@@ -86,17 +107,20 @@ impl axum::response::IntoResponse for AuthHttpError {
             | AuthError::InvalidAccessExpiry
             | AuthError::InvalidRefreshTokenHash
             | AuthError::InvalidRefreshExpiry => StatusCode::BAD_REQUEST,
-            AuthError::SessionNotFound | AuthError::RefreshTokenFamilyNotFound => {
-                StatusCode::NOT_FOUND
-            }
-            AuthError::SessionRevoked
+            AuthError::AccountNotFound
+            | AuthError::DeviceNotFound
+            | AuthError::SessionNotFound
+            | AuthError::RefreshTokenFamilyNotFound => StatusCode::NOT_FOUND,
+            AuthError::AccountNotActive
+            | AuthError::DeviceNotActive
+            | AuthError::DeviceAccountMismatch
+            | AuthError::SessionRevoked
             | AuthError::SessionExpired
             | AuthError::SessionAlreadyExists
             | AuthError::RefreshTokenFamilyAlreadyExists
             | AuthError::RefreshTokenCompromised
-            | AuthError::RefreshTokenMismatch
-            | AuthError::InsufficientScope => StatusCode::CONFLICT,
-            AuthError::Storage(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            | AuthError::RefreshTokenMismatch => StatusCode::CONFLICT,
+            AuthError::Lifecycle(_) | AuthError::Storage(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         (
@@ -118,6 +142,7 @@ struct ErrorResponse {
 
 fn error_code(error: &AuthError) -> &'static str {
     match error {
+        AuthError::InsufficientScope => "insufficient_scope",
         AuthError::InvalidSessionId => "invalid_session_id",
         AuthError::InvalidAccountId => "invalid_account_id",
         AuthError::InvalidDeviceId => "invalid_device_id",
@@ -126,6 +151,11 @@ fn error_code(error: &AuthError) -> &'static str {
         AuthError::InvalidAccessExpiry => "invalid_access_expiry",
         AuthError::InvalidRefreshTokenHash => "invalid_refresh_token_hash",
         AuthError::InvalidRefreshExpiry => "invalid_refresh_expiry",
+        AuthError::AccountNotFound => "account_not_found",
+        AuthError::AccountNotActive => "account_not_active",
+        AuthError::DeviceNotFound => "device_not_found",
+        AuthError::DeviceNotActive => "device_not_active",
+        AuthError::DeviceAccountMismatch => "device_account_mismatch",
         AuthError::SessionNotFound => "session_not_found",
         AuthError::SessionRevoked => "session_revoked",
         AuthError::SessionExpired => "session_expired",
@@ -134,7 +164,7 @@ fn error_code(error: &AuthError) -> &'static str {
         AuthError::RefreshTokenFamilyAlreadyExists => "refresh_token_family_already_exists",
         AuthError::RefreshTokenCompromised => "refresh_token_compromised",
         AuthError::RefreshTokenMismatch => "refresh_token_mismatch",
-        AuthError::InsufficientScope => "insufficient_scope",
+        AuthError::Lifecycle(_) => "lifecycle_failure",
         AuthError::Storage(_) => "storage_failure",
     }
 }

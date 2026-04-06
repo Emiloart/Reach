@@ -1,4 +1,5 @@
 use reach_config::{FromEnvironment, IdentityServiceConfig};
+use reach_request_auth::InternalRequestAuthenticator;
 use secrecy::ExposeSecret;
 use sqlx::postgres::PgPoolOptions;
 use std::{sync::Arc, time::Duration};
@@ -14,6 +15,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .acquire_timeout(Duration::from_secs(config.database.acquire_timeout_seconds))
         .connect(config.database.url.expose_secret())
         .await?;
+    let authenticator = Arc::new(InternalRequestAuthenticator::from_config(
+        &config.internal_auth,
+    )?);
     let repository = reach_identity_service::repository::CockroachIdentityRepository::new(pool);
     let use_cases: Arc<dyn reach_identity_service::application::IdentityUseCases> =
         Arc::new(reach_identity_service::application::IdentityCommandService::new(repository));
@@ -21,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(config.http.bind_addr).await?;
     axum::serve(
         listener,
-        reach_identity_service::bootstrap::build_router(use_cases),
+        reach_identity_service::bootstrap::build_router(use_cases, authenticator),
     )
     .await?;
 

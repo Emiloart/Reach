@@ -3,7 +3,7 @@ use crate::{
     repository::{
         KeyBundleCommandRepository, KeyBundleRepository, KeyConstraintViolation,
         KeyRepositoryError, OneTimePrekeyRepository, PublishCurrentKeyBundleRecord,
-        SignedPrekeyRepository,
+        PublishSignedPrekeyRecord, SignedPrekeyCommandRepository, SignedPrekeyRepository,
     },
 };
 use async_trait::async_trait;
@@ -19,6 +19,10 @@ pub struct CockroachKeyRepository {
 impl CockroachKeyRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
     }
 }
 
@@ -108,6 +112,32 @@ impl KeyBundleRepository for CockroachKeyRepository {
 
 #[async_trait]
 impl SignedPrekeyRepository for CockroachKeyRepository {
+    async fn get_current(
+        &self,
+        device_id: DeviceId,
+    ) -> Result<Option<SignedPrekey>, KeyRepositoryError> {
+        let row = sqlx::query_as::<_, SignedPrekeyRow>(
+            r#"
+            SELECT
+                signed_prekey_id,
+                device_id,
+                public_key,
+                signature,
+                created_at,
+                superseded_at
+            FROM keys.signed_prekeys
+            WHERE device_id = $1
+              AND superseded_at IS NULL
+            "#,
+        )
+        .bind(device_id.0)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(KeyRepositoryError::Database)?;
+
+        Ok(row.map(Into::into))
+    }
+
     async fn get_by_id(
         &self,
         signed_prekey_id: Uuid,
@@ -158,6 +188,70 @@ impl SignedPrekeyRepository for CockroachKeyRepository {
         .map_err(map_signed_prekey_insert_error)?;
 
         Ok(())
+    }
+}
+
+#[async_trait]
+impl SignedPrekeyCommandRepository for CockroachKeyRepository {
+    async fn publish_current_signed_prekey(
+        &self,
+        command: &PublishSignedPrekeyRecord,
+    ) -> Result<SignedPrekey, KeyRepositoryError> {
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(KeyRepositoryError::Database)?;
+
+        sqlx::query(
+            r#"
+            UPDATE keys.signed_prekeys
+            SET superseded_at = $2
+            WHERE device_id = $1
+              AND superseded_at IS NULL
+            "#,
+        )
+        .bind(command.device_id.0)
+        .bind(command.created_at)
+        .execute(&mut *transaction)
+        .await
+        .map_err(KeyRepositoryError::Database)?;
+
+        let signed_prekey = sqlx::query_as::<_, SignedPrekeyRow>(
+            r#"
+            INSERT INTO keys.signed_prekeys (
+                signed_prekey_id,
+                device_id,
+                public_key,
+                signature,
+                created_at,
+                superseded_at
+            )
+            VALUES ($1, $2, $3, $4, $5, NULL)
+            RETURNING
+                signed_prekey_id,
+                device_id,
+                public_key,
+                signature,
+                created_at,
+                superseded_at
+            "#,
+        )
+        .bind(command.signed_prekey_id)
+        .bind(command.device_id.0)
+        .bind(&command.public_key)
+        .bind(&command.signature)
+        .bind(command.created_at)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(map_signed_prekey_insert_error)?;
+
+        transaction
+            .commit()
+            .await
+            .map_err(KeyRepositoryError::Database)?;
+
+        Ok(signed_prekey.into())
     }
 }
 
