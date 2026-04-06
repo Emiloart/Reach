@@ -1,23 +1,26 @@
 # AGENTS.md
 
-## Reach Agent Operating Standard
+## Reach Repository Operating Standard
 
-This file is the authoritative execution standard for agentic work in this repository.
+This file is the authoritative operating contract for:
+- Codex
+- AI code assistants
+- autonomous engineering tools
 
-Reach is a serious privacy-first communications platform. Agents working here must behave like principal-level engineers building a high-trust messaging company, not like prototype generators.
+It applies to all work in this repository unless an explicit repository-owner instruction for the current task says otherwise.
 
-If a future instruction conflicts with this file, prefer:
+Precedence order:
 1. explicit repository-owner instruction in the current task
 2. accepted ADRs and implemented repository structure
 3. this file
 
-This file must be read as an implementation constraint, not as aspirational prose.
+This file is an execution constraint. It is not aspirational prose.
 
 ---
 
 ## 1. Mission
 
-Reach is being built as a privacy-first communication platform for global adoption.
+Reach is a serious privacy-first communications platform for global adoption.
 
 Core goals:
 - true end-to-end encrypted messaging
@@ -31,7 +34,7 @@ Core goals:
 - strong long-term maintainability
 - serious trust posture from day one
 
-This repository is not for demo-grade social features or shallow scaffolding.
+This repository is not for demo-grade social features, shallow scaffolding, or convenience-first shortcuts on core systems.
 
 When forced to choose, optimize in this order:
 1. security
@@ -45,20 +48,41 @@ When forced to choose, optimize in this order:
 
 ---
 
-## 2. Global Repository Rules
+## 2. Engineering Philosophy
+
+Agents and contributors must work like principal-level engineers building a high-trust messaging company.
+
+Default engineering philosophy:
+- security first
+- privacy first
+- modular monolith first, split later only when justified
+- strongly typed interfaces
+- explicit trust boundaries
+- explicit service ownership
+- thin transport layers
+- application-layer invariants
+- low implicit magic
+- production-safe implementation over fast scaffolding
+- honest reporting of blockers and gaps
+
+Prefer boring, proven infrastructure for critical paths. Do not confuse novelty with quality.
+
+---
+
+## 3. Global Rules
 
 Agents must:
 - inspect the repo before proposing or making changes
 - preserve the established architecture unless there is a strong reason to change it
 - keep security and privacy tradeoffs explicit
-- keep transport layers thin
-- keep business logic in application and domain layers
 - keep service ownership boundaries explicit
 - keep durable state, ephemeral state, and encrypted blob boundaries separate
+- keep HTTP and transport layers thin
+- keep business logic in application and domain layers
 - state blockers honestly
 - state assumptions explicitly
 - provide real validation after meaningful changes
-- implement narrow, production-safe steps instead of broad speculative feature jumps
+- implement narrow, production-safe steps instead of speculative breadth
 
 Agents must never:
 - fabricate completion
@@ -69,7 +93,7 @@ Agents must never:
 - add broad feature sprawl when a narrow foundational step is required
 - move security-sensitive logic into the wrong layer for convenience
 - store privacy-critical durable truth in caches
-- invent fake crypto behavior
+- invent fake cryptographic behavior
 - ship demo shortcuts into core systems
 
 If blocked by missing infrastructure, secrets, environment, provider access, or runtime dependencies:
@@ -79,9 +103,9 @@ If blocked by missing infrastructure, secrets, environment, provider access, or 
 
 ---
 
-## 3. Current Architecture Direction
+## 4. Current Architecture Direction
 
-Unless explicitly changed by repo owners, the current architectural direction is:
+Unless explicitly changed by repository owners, Reach currently assumes:
 
 ### Clients
 - iOS: Swift + SwiftUI
@@ -103,42 +127,12 @@ Unless explicitly changed by repo owners, the current architectural direction is
 - privacy-minimized observability using OpenTelemetry-based tooling
 
 ### Crypto Direction
-- Signal-style principles for 1:1 secure messaging
+- Signal-style principles for 1:1 messaging
 - MLS/OpenMLS later for group messaging
 - per-device trust roots
 - hardware-backed key storage where platform support exists
 
 Do not casually replace these choices.
-
----
-
-## 4. Current Repository Shape
-
-The repository currently uses a serious monorepo structure with explicit service and shared-library boundaries.
-
-Top-level areas:
-- `services/`
-- `libs/`
-- `docs/`
-- future-oriented `apps/` and `infra/` direction documented in the blueprint
-
-Current shared libraries include:
-- `libs/config`
-- `libs/telemetry`
-- `libs/auth-types`
-- `libs/request-auth`
-- `libs/identity-lifecycle`
-- `libs/testing`
-
-Current service crates include:
-- `services/identity`
-- `services/auth`
-- `services/keys`
-- `services/messaging-ingress`
-
-Agents must follow the existing naming, workspace, and crate patterns already present in the repo.
-
-Do not introduce a competing architectural style.
 
 ---
 
@@ -181,8 +175,8 @@ Owns:
 Does not own:
 - account truth
 - device truth
-- session/auth truth
-- ratchet/session crypto
+- session or auth truth
+- ratchet or session crypto
 - message transport
 
 Keys may read identity lifecycle state through explicit read-only contracts. It does not own identity data.
@@ -191,7 +185,7 @@ Keys may read identity lifecycle state through explicit read-only contracts. It 
 Owns:
 - message intake boundaries
 - encrypted envelope intake metadata
-- future ingress-side validation concerns
+- ingress-side validation concerns
 
 Does not own:
 - delivery
@@ -205,28 +199,29 @@ Agents must preserve these ownership boundaries unless explicitly instructed oth
 
 ---
 
-## 6. Current Trust and Authorization Model
+## 6. Persistence Rules
 
-The repo already implements a narrow internal trust layer. Future work must preserve and extend it carefully.
+Durable truth must live in the correct durable store.
 
-Current state:
-- `libs/auth-types` defines shared principal and scope types
-- `libs/request-auth` authenticates internal service callers at the HTTP boundary
-- `X-Reach-Service` plus bearer token are used for current internal request authentication
-- application-layer command handlers enforce authorization explicitly
-- `libs/identity-lifecycle` provides explicit read-only lifecycle checks for auth and keys
-
-Current principal model:
-- internal service principal is implemented
-- future user/device principal exists in shared types but is not yet verified at the HTTP boundary
+Agents must:
+- keep CockroachDB as the source of truth for durable service metadata
+- keep schema ownership clear per service
+- keep object storage limited to encrypted blobs and related blob-manifest concerns
+- keep Valkey/Redis limited to ephemeral state only
+- define transactional boundaries explicitly when relevant
+- define retention and deletion semantics intentionally
 
 Agents must not:
-- pretend user-facing auth is complete
-- blur internal service auth into product auth
-- hide authorization inside route glue
-- bypass application-layer scope enforcement
+- use caches as durable truth
+- blur table ownership between services
+- create hidden shared-write access across service domains
 
-HTTP authentication should stay thin. Authorization must remain explicit in application entry points.
+Changes should make clear where relevant:
+- source of truth
+- transaction boundary
+- uniqueness and invariants
+- deletion semantics
+- revocation semantics
 
 ---
 
@@ -242,7 +237,7 @@ Agents must:
 - define trust boundaries clearly
 - define threat implications of major changes
 - treat admin capability as dangerous by default
-- keep authn and authz logic explicit
+- keep authentication and authorization logic explicit
 - ensure privileged actions are auditable where relevant
 
 Agents must never:
@@ -283,127 +278,45 @@ Agents must not casually introduce:
 For any telemetry or observability work, agents must specify:
 - what is collected
 - why it is needed
-- why it does not violate Reach’s privacy posture
+- why it does not violate Reach's privacy posture
 
 ---
 
-## 9. Code Quality Rules
+## 9. Architecture Constraints
 
-All code must be:
-- production-oriented
-- typed
-- testable
-- readable
-- modular
-- explicit in validation
-- explicit in failure handling
-- explicit in ownership boundaries
+The repository should be treated as a serious monorepo with explicit boundaries.
+
+Current top-level direction:
+- `services/`
+- `libs/`
+- `docs/`
+- `apps/` and `infra/` as documented expansion areas
+
+Current shared crates:
+- `libs/config`
+- `libs/telemetry`
+- `libs/auth-types`
+- `libs/request-auth`
+- `libs/identity-lifecycle`
+- `libs/testing`
+
+Current active service crates:
+- `services/identity`
+- `services/auth`
+- `services/keys`
+- `services/messaging-ingress`
+
+Directory presence does not imply active ownership or deployable status. Some future-oriented directories exist in the repo but are not active workspace members yet.
 
 Agents must:
-- use clear naming
-- separate domain, application, repository, and transport concerns
-- use structured error types
-- validate inputs intentionally
-- keep changes focused
-- make transaction boundaries explicit when relevant
-
-Agents must not:
-- create giant mixed-responsibility files
-- bury business logic in HTTP handlers
-- swallow errors
-- create fake completeness with weak scaffolding
-- introduce undocumented magic behavior
+- follow existing naming and workspace patterns
+- preserve modular boundaries
+- avoid introducing a competing architectural style
+- avoid extracting microservices early without a fault-isolation, scale, or security reason
 
 ---
 
-## 10. Persistence and State Rules
-
-Durable truth must live in the correct durable store.
-
-Agents must:
-- keep CockroachDB as the source of truth for durable service metadata
-- keep object storage limited to encrypted blobs and related blob-manifest concerns
-- keep Valkey/Redis limited to ephemeral state only
-- define transactional boundaries explicitly when relevant
-- define retention and deletion semantics intentionally
-- keep schema ownership clear per service
-
-Agents must not:
-- use caches as durable truth
-- blur table ownership between services
-- create hidden shared-write access across service domains
-
-Changes should make clear where relevant:
-- source of truth
-- transaction boundary
-- uniqueness and invariants
-- deletion or revocation semantics
-
----
-
-## 11. API and Command Handling Rules
-
-Agents must prefer thin transport layers and explicit application-layer command handling.
-
-For command or use-case paths, agents should define:
-- input DTO
-- validation rules
-- domain errors
-- repository interactions
-- transaction boundaries
-- invariants enforced
-- authorization requirements
-
-Agents must not:
-- stuff business logic into route handlers
-- expose broad new surfaces before trust checks exist
-- invent speculative orchestration between services
-
-Minimal safe surfaces are preferred over broad feature APIs.
-
----
-
-## 12. Testing Rules
-
-Serious changes require meaningful validation.
-
-Agents should add tests appropriate to the change, including where relevant:
-- unit tests
-- repository tests
-- application-command tests
-- concurrency tests
-- invalid-state tests
-- replay or reuse tests
-- migration-related checks
-- lifecycle or authorization regression tests
-
-The current repository already uses Cockroach-backed repository and application tests. Do not replace real storage tests with fake in-memory substitutes for core persistence logic.
-
-Agents must not claim readiness without identifying remaining untested areas.
-
-Validation output should be concrete, for example:
-- `cargo fmt --all --check`
-- `cargo check --workspace`
-- `cargo test --workspace`
-
----
-
-## 13. Documentation Rules
-
-For meaningful work, agents should provide concise but complete documentation of:
-- what changed
-- why it changed
-- security and privacy implications
-- validation performed
-- remaining gaps
-
-Use ADRs, schema notes, API notes, and threat-model docs where appropriate.
-
-Avoid filler and generic commentary.
-
----
-
-## 14. Scope Control Rules
+## 10. Scope Control Rules
 
 Reach must be built in the correct order.
 
@@ -419,24 +332,55 @@ Current preferred progression:
 
 Agents must resist:
 - premature breadth
-- jumping to delivery before trust/state layers are correct
+- jumping to delivery before trust and state layers are correct
 - bolting on product features before invariants are stable
-
-Do not expand into these areas unless explicitly requested and justified by the current milestone:
-- full messaging send/delivery logic
-- transparency log implementation
-- MLS/group crypto implementation
-- contact discovery
-- moderation platform expansion
-- broad analytics systems
-- speculative multi-cloud complexity
-- rich admin/control-plane features unrelated to the current step
-- fake cryptographic session establishment
-- user-facing auth/token systems beyond the current milestone
 
 ---
 
-## 15. Expected Response Format
+## 11. Testing Expectations
+
+Serious changes require meaningful validation.
+
+Agents should add tests appropriate to the change, including where relevant:
+- unit tests
+- repository tests
+- application-command tests
+- concurrency tests
+- invalid-state tests
+- replay or reuse tests
+- migration-related checks
+- lifecycle or authorization regression tests
+
+The current repository already uses Cockroach-backed repository and application tests. Do not replace real storage tests with fake in-memory substitutes for core persistence logic.
+
+Validation output should be concrete, for example:
+- `cargo fmt --all --check`
+- `cargo check --workspace`
+- `cargo test --workspace`
+
+Agents must not claim readiness without identifying remaining untested areas.
+
+---
+
+## 12. Documentation Rules
+
+For meaningful work, agents should provide concise but complete documentation of:
+- what changed
+- why it changed
+- security and privacy implications
+- validation performed
+- remaining gaps
+
+Use ADRs, schema notes, API notes, and threat-model docs where appropriate.
+
+All structural architecture changes must create or update an ADR.
+All major security-sensitive features must reference threat-model documentation.
+
+Avoid filler and generic commentary.
+
+---
+
+## 13. Response Format Expectations
 
 For serious engineering work, agents should usually respond in this shape:
 1. Objective
@@ -460,7 +404,23 @@ Responses should be concrete, implementation-aware, and concise.
 
 ---
 
-## 16. What Best Result Means Here
+## 14. Explicit Non-Goals
+
+Do not introduce these unless explicitly requested and justified by the current milestone:
+- full messaging send or delivery logic
+- transparency log implementation
+- MLS or group crypto implementation
+- contact discovery
+- moderation platform expansion
+- broad analytics systems
+- speculative multi-cloud complexity
+- rich admin or control-plane features unrelated to the current step
+- fake cryptographic session establishment
+- user-facing auth or token systems beyond the current milestone
+
+---
+
+## 15. What Best Result Means Here
 
 For Reach, best result means:
 - trustworthy architecture
