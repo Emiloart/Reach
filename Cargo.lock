@@ -1274,6 +1274,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "reach-key-material"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "reach-auth-types",
+ "sqlx",
+ "thiserror",
+ "uuid",
+]
+
+[[package]]
 name = "reach-key-service"
 version = "0.1.0"
 dependencies = [
@@ -1305,8 +1317,16 @@ dependencies = [
  "chrono",
  "reach-auth-types",
  "reach-config",
+ "reach-identity-lifecycle",
+ "reach-identity-service",
+ "reach-key-material",
+ "reach-key-service",
+ "reach-request-auth",
  "reach-telemetry",
+ "reach-test-support",
+ "secrecy",
  "serde",
+ "sqlx",
  "thiserror",
  "tokio",
  "tower",

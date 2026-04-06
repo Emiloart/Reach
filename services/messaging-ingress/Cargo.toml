@@ -12,11 +12,19 @@ axum.workspace = true
 chrono.workspace = true
 reach-auth-types = { path = "../../libs/auth-types" }
 reach-config = { path = "../../libs/config" }
+reach-identity-lifecycle = { path = "../../libs/identity-lifecycle" }
+reach-key-material = { path = "../../libs/key-material" }
+reach-request-auth = { path = "../../libs/request-auth" }
 reach-telemetry = { path = "../../libs/telemetry" }
+secrecy.workspace = true
 serde.workspace = true
+sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+reach-identity-service = { path = "../identity" }
+reach-key-service = { path = "../keys" }
+reach-test-support = { path = "../../libs/testing" }
 tower.workspace = true

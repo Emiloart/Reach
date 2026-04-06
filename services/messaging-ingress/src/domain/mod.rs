@@ -1,33 +1,57 @@
 use chrono::{DateTime, Utc};
-use reach_auth_types::{AccountId, ConversationId, DeviceId};
+use reach_auth_types::{AccountId, DeviceId};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum DirectConversationState {
-    Active,
-    Archived,
+pub enum PrekeyResolutionMode {
+    CurrentBundleOnly,
+    CurrentBundleAndOneTimePrekey,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DirectConversation {
-    pub conversation_id: ConversationId,
-    pub participant_a_account_id: AccountId,
-    pub participant_b_account_id: AccountId,
-    pub state: DirectConversationState,
-    pub default_expire_after_seconds: Option<i32>,
-    pub created_at: DateTime<Utc>,
+impl PrekeyResolutionMode {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::CurrentBundleOnly => "current_bundle_only",
+            Self::CurrentBundleAndOneTimePrekey => "current_bundle_and_one_time_prekey",
+        }
+    }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MessageIntakeRecord {
-    pub message_id: Uuid,
-    pub conversation_id: ConversationId,
+impl TryFrom<&str> for PrekeyResolutionMode {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "current_bundle_only" => Ok(Self::CurrentBundleOnly),
+            "current_bundle_and_one_time_prekey" => Ok(Self::CurrentBundleAndOneTimePrekey),
+            invalid => Err(invalid.to_owned()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EncryptedEnvelope {
+    pub envelope_id: Uuid,
     pub sender_account_id: AccountId,
     pub sender_device_id: DeviceId,
-    pub client_message_id: Uuid,
-    pub ciphertext_size_bytes: i32,
-    pub server_received_at: DateTime<Utc>,
-    pub expires_at: Option<DateTime<Utc>>,
+    pub recipient_account_id: AccountId,
+    pub recipient_device_id: DeviceId,
+    pub encrypted_payload: Vec<u8>,
+    pub content_type: String,
+    pub client_timestamp: DateTime<Utc>,
+    pub replay_nonce: Vec<u8>,
+    pub payload_version: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcceptedEncryptedEnvelope {
+    #[serde(flatten)]
+    pub envelope: EncryptedEnvelope,
+    pub accepted_at: DateTime<Utc>,
+    pub recipient_bundle_id: Uuid,
+    pub recipient_signed_prekey_id: Uuid,
+    pub claimed_one_time_prekey_id: Option<Uuid>,
+    pub prekey_resolution_mode: PrekeyResolutionMode,
 }

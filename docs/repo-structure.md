@@ -28,6 +28,7 @@ Current active shared crates:
 - `libs/auth-types`: shared principal, scope, and auth-domain types
 - `libs/request-auth`: HTTP-boundary internal request authentication
 - `libs/identity-lifecycle`: read-only lifecycle checks for dependent services
+- `libs/key-material`: explicit current-bundle and one-time-prekey contract used by ingress-stage flows
 - `libs/testing`: Cockroach-backed test support
 
 Future-oriented library directories may exist, but they are not automatically active design commitments.

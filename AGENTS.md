@@ -298,6 +298,7 @@ Current shared crates:
 - `libs/auth-types`
 - `libs/request-auth`
 - `libs/identity-lifecycle`
+- `libs/key-material`
 - `libs/testing`
 
 Current active service crates:

@@ -31,6 +31,7 @@ pub enum AuthScope {
     KeysOneTimePrekeysPublish,
     KeysOneTimePrekeyClaim,
     KeysBundleRead,
+    MessagingIngressEnvelopeAccept,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

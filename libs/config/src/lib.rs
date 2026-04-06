@@ -109,6 +109,7 @@ pub struct MessagingIngressServiceConfig {
     pub valkey: ValkeyConfig,
     pub jetstream: JetStreamConfig,
     pub telemetry: TelemetryConfig,
+    pub internal_auth: InternalAuthConfig,
 }
 
 pub trait FromEnvironment: Sized + DeserializeOwned {
