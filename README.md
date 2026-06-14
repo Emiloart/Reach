@@ -8,7 +8,7 @@ The product is being designed as a communications security system with consumer-
 
 This repository currently contains the foundational architecture documentation for the first production build of Reach. The implementation should follow the monorepo and service boundaries described in the blueprint before feature work begins.
 
-## Core Principles
+## Core Principles 
 
 - Privacy is a product requirement, not a settings screen.
 - The server may route encrypted messages, but it should learn as little as possible about who said what and when.
