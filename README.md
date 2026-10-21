@@ -14,7 +14,6 @@ The goal is not to build another conventional social app. Reach is being built a
 - **Metadata minimization.** Collect, retain, and expose as little information as practical. Logs, traces, and metrics must not contain message plaintext or secret material.
 - **Device-level trust.** Devices are explicit security principals with their own lifecycle and key material.
 - **Communication-first scope.** Product capabilities must serve secure communication; anonymous communities, public social feeds, and social publishing are outside Reach's core scope.
-- **Communication-first scope.** Product capabilities must serve secure communication; anonymous communities, public social feeds, and social publishing are outside Reach's core scope.
 - **Clear ownership boundaries.** Identity, authentication, key management, and messaging ingress have separate responsibilities and state ownership.
 - **Established cryptography.** Build on reviewed protocols and libraries rather than inventing cryptographic primitives.
 - **Privacy-compatible abuse controls.** Abuse response should use scoped evidence and explicit user action, not routine access to everyone’s message content.
