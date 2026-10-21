@@ -28,11 +28,13 @@ Core goals:
 - secure direct messaging
 - secure group messaging
 - disappearing messages and self-destructing lifecycle controls
-- pseudonymous and scoped identity patterns
+- privacy-preserving account and device identity
 - abuse resistance without collapsing the privacy model
 - production-grade reliability
 - strong long-term maintainability
 - serious trust posture from day one
+
+Reach is communication infrastructure, not an anonymous social network. Anonymous communities, public social feeds, and social publishing are outside its product scope.
 
 This repository is not for demo-grade social features, shallow scaffolding, or convenience-first shortcuts on core systems.
 
@@ -266,7 +268,7 @@ Agents must prefer:
 - encrypted storage where appropriate
 - client-side encryption where required
 - narrow telemetry
-- scoped or pseudonymous identity patterns where needed
+- privacy-preserving identity patterns where needed
 
 Agents must not casually introduce:
 - invasive analytics
