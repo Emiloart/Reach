@@ -183,7 +183,6 @@ CockroachDB is the source of truth for durable product metadata. Valkey is ephem
 #### `directory`
 
 - `username_index`: canonical search and resolution mapping
-- `scoped_handles`: community-local aliases and pseudonyms
 - `discovery_tokens`: blinded or hashed discovery artifacts
 - `directory_policy_overrides`: user visibility and lookup constraints
 
