@@ -2,7 +2,7 @@
 
 **Privacy-first communications infrastructure, built around device trust, encrypted message transport, and metadata minimization.**
 
-Reach is being engineered as a secure communications platform for direct messages, private groups, and pseudonymous communities. Its architecture treats privacy and security as system-level constraints rather than optional product settings.
+Reach is being engineered as privacy-first communications infrastructure. Its core scope is secure direct messaging and private group messaging, supported by strong device trust, end-to-end encryption, and metadata minimization. Reach is not an anonymous community or social-network product.
 
 The goal is not to build another conventional social app. Reach is being built around a clear separation between identity, authentication, device keys, message intake, and eventual delivery, so each security-sensitive domain has explicit ownership and enforceable boundaries.
 
@@ -13,6 +13,7 @@ The goal is not to build another conventional social app. Reach is being built a
 - **Client-side confidentiality.** Message plaintext should remain within client trust boundaries; servers handle encrypted payloads and the minimum routing metadata required.
 - **Metadata minimization.** Collect, retain, and expose as little information as practical. Logs, traces, and metrics must not contain message plaintext or secret material.
 - **Device-level trust.** Devices are explicit security principals with their own lifecycle and key material.
+- **Communication-first scope.** Product capabilities must serve secure communication; anonymous communities, public social feeds, and social publishing are outside Reach's core scope.
 - **Clear ownership boundaries.** Identity, authentication, key management, and messaging ingress have separate responsibilities and state ownership.
 - **Established cryptography.** Build on reviewed protocols and libraries rather than inventing cryptographic primitives.
 - **Privacy-compatible abuse controls.** Abuse response should use scoped evidence and explicit user action, not routine access to everyone’s message content.
@@ -173,7 +174,7 @@ Reach is being developed in dependency order:
 2. **Identity and trust:** account/device lifecycle, authentication, key lifecycle, authorization, and revocation behavior.
 3. **Messaging intake:** authenticated encrypted-envelope intake, validation, and idempotency/replay protections.
 4. **End-to-end messaging:** client cryptography, recipient delivery, offline behavior, and delivery acknowledgements.
-5. **Private communications:** encrypted attachments, disappearing-message semantics, device linking, and small private groups.
+5. **Private communications:** encrypted attachments, disappearing-message semantics, device linking, and secure group messaging.
 6. **Verification and scale:** key transparency, MLS-backed groups, operational hardening, multi-region deployment, and independent security review.
 
 Roadmap order may change when implementation evidence or security review identifies a dependency that must be resolved first.
