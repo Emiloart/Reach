@@ -4,13 +4,13 @@
 
 This document defines the first production architecture for Reach as a serious, global, privacy-first messaging platform. It is intentionally opinionated. The goal is to remove ambiguity before implementation starts.
 
-Reach is not being designed as a general social network. It is a privacy-native communication platform that combines:
+Reach is a privacy-first communications platform. Its product scope is secure communication, not anonymous social networking or community publishing. Core capabilities are:
 
 - end-to-end encrypted direct messaging
-- small private groups and later large MLS-backed groups
-- pseudonymous, community-scoped identity
-- disappearing messages and self-destruct flows
-- privacy-preserving trust, moderation, and abuse response
+- secure private group messaging, with MLS as a later protocol direction
+- privacy-preserving account and device identity
+- disappearing-message controls where safely implemented
+- abuse resistance that respects end-to-end encryption and data minimization
 
 ## 2. Architectural Principles
 
@@ -94,7 +94,7 @@ The service list below is the authoritative production target. In the first buil
 | Transparency Service | Append-only key log, signed tree heads, inclusion proofs, auditor checkpoints, public verification exports | Prekey retrieval, session bootstrap logic | `transparency.*`, object snapshots | gRPC, export API |
 | Messaging Ingress Service | Accept encrypted envelopes, validate sender/session state, assign message IDs, publish delivery jobs | Recipient websocket delivery, push notifications | `messaging_ingress.*`, JetStream streams | gRPC, NATS |
 | Delivery Service | Recipient routing, online delivery, offline queue management, ack tracking, expiration enforcement | Group policy changes, spam investigation | `delivery.*`, Valkey routing keys | gRPC, WebSocket workers, NATS |
-| Group Service | Group and community metadata, memberships, roles, invites, MLS epoch orchestration, scoped pseudonyms | Direct message delivery, push token storage | `groups.*` | gRPC, NATS |
+| Group Service | Private group metadata, memberships, roles, invites, MLS epoch orchestration | Direct message delivery, push token storage | `groups.*` | gRPC, NATS |
 | Media Service | Upload tickets, encrypted object manifests, retention lifecycle, malware scan orchestration, quota enforcement | Message plaintext, push notifications | `media.*`, R2 buckets | HTTPS, gRPC, NATS |
 | Presence Service | Online status, typing indicators, ephemeral room state, last-seen policy enforcement | Durable account status, read receipts history | `presence.*`, Valkey | gRPC |
 | Notification Service | APNs and FCM delivery, token hygiene, silent wake orchestration, suppression policies | Account identity, message storage | `notifications.*` | gRPC, provider APIs |
@@ -219,13 +219,12 @@ CockroachDB is the source of truth for durable product metadata. Valkey is ephem
 
 #### `groups`
 
-- `groups`: private groups and communities, policy flags, creator device, visibility class
+- `groups`: private messaging groups, policy flags, creator device, membership and access state
 - `group_memberships`: membership state per account and device
 - `group_roles`: admin, moderator, member, banned, muted
 - `group_invites`: invite objects, expiry, redemption state
 - `group_epochs`: current and historical MLS epoch metadata
-- `community_spaces`: higher-level community containers
-- `scoped_profiles`: per-community handles, avatars, and reputation references
+
 
 #### `media`
 
@@ -590,14 +589,13 @@ Exit criteria:
 - no plaintext content in logs or metrics labels
 - abuse reporting and suspension workflows operable by internal staff
 
-### Phase 2: Growth and Community Layer
+### Phase 2: Growth in Private Communications
 
 Scope:
 
-- usernames and scoped community handles
-- private contact discovery roadmap start
-- larger private groups
-- community moderation roles
+- privacy-conscious account identifiers and contact discovery research
+- larger private messaging groups
+- group membership and administration controls
 - invite graph scoring and better anti-spam controls
 - secure encrypted backup and recovery
 - APAC regional expansion
@@ -618,7 +616,7 @@ Exit criteria:
 
 Scope:
 
-- MLS-native groups and community state
+- MLS-native private group messaging
 - voice notes
 - Web client with constrained trust model
 - calls via self-hosted LiveKit and coturn
@@ -642,7 +640,7 @@ Exit criteria:
 Scope:
 
 - organization and team mode
-- premium communities and trust tooling
+- premium communication and trust tooling
 - stronger compliance workflow partitioning
 - external auditors and bug bounty program
 - maturity work on policy, legal, support, and incident response
